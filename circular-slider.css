@@ -1,0 +1,22 @@
+.cs__sliders-gfx {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.cs__info {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cs__info-legend {
+  display: inline-block;
+  width: 20px;
+  height: 10px;
+}
+
+.cs__slider {
+  fill: none;
+  stroke-width: 3;
+}

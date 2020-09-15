@@ -1,3 +1,35 @@
+// Helper to build SVG elements / trees
+const svg = (tag, attrs = {}, ...children) => {
+  const el = document.createElementNS('http://www.w3.org/2000/svg', tag)
+  Object.keys(attrs).forEach(attr => {
+    el.setAttributeNS(null, attr, attrs[attr])
+  })
+  children.forEach(c => {
+    if (!c.toString()) return // Skip empty strings
+    if (typeof c !== 'object') {
+      c = document.createTextNode(c.toString())
+    }
+    el.appendChild(c)
+  })
+  return el
+}
+
+// Helper to build HTML elements / trees
+const html = (tag, attrs = {}, ...children) => {
+  const el = document.createElement(tag)
+  Object.keys(attrs).forEach(attr => {
+    el.setAttribute(attr, attrs[attr])
+  })
+  children.forEach(c => {
+    if (!c.toString()) return // Skip empty strings
+    if (typeof c !== 'object') {
+      c = document.createTextNode(c.toString())
+    }
+    el.appendChild(c)
+  })
+  return el
+}
+
 class CircularSlider {
   constructor (container, slidersConfigs) {
     this.dom = this._constructContainer(container)
@@ -15,31 +47,58 @@ class CircularSlider {
   }
 
   getValue (sliderId) {
-    // TODO: Return value for specified slider
-    console.log(`Get value for ${sliderId}`)
+    if (!sliderId) {
+      return this.sliders.map(({ id, value }) => ({ id, value }))
+    }
+    const { value } = this.sliders.find(slider => slider.id === sliderId)
+    return value
   }
 
   setValue (sliderId, value) {
-    // TODO: Set value for specified slider
-    console.log(`Set value ${value} for ${sliderId}`)
+    const sliderIdx = this.sliders.findIndex(slider => slider.id === sliderId)
+    if (sliderIdx < 0) return
+    this._updateSliderValue(sliderIdx, value)
   }
 
   _constructContainer (containerNode) {
-    // TODO: generate DOM
+    // Generate basic DOM for the area with sliders
+    const slidersWrapper = html('div', { class: 'cs__sliders' })
+    const slidersSvg = svg('svg', { class: 'cs__sliders-gfx', preserveAspectRatio: 'xMidYMid meet' })
+    const interactiveSurface = html('div', { class: 'cs__sliders-surface' })
+    slidersWrapper.appendChild(slidersSvg)
+    slidersWrapper.appendChild(interactiveSurface)
+
+    // Generate basic DOM for the area with color legend and values
+    const infoWrapper = html('ul', { class: 'cs__info' })
+
+    // Append all to the container
+    const fragments = new DocumentFragment()
+    fragments.appendChild(slidersWrapper)
+    fragments.appendChild(infoWrapper)
+    containerNode.appendChild(fragments)
+
+    // Return references to DOM nodes
     return {
-      sliders: '', // TODO: SVG
-      info: '' // TODO: color legend and values
+      sliders: slidersSvg,
+      info: infoWrapper
     }
   }
 
   _constructSlider ({ id, color, min = 0, max = 100, step = 1, value = 0}) {
-    // TODO: generate DOM for slider =>
-    const sliderElement = ''
-    // this.dom.sliders.append(sliderElement)
+    // Create SVG circle
+    const [r, viewBox] = this._recalculateDimensions()
+    this.dom.sliders.setAttributeNS(null, 'viewBox', viewBox)
+    const sliderElement = svg('circle', { class: 'cs__slider', x: 0, y: 0, r, stroke: color })
 
-    // TODO: generate DOM for legend and value =>
-    const valueElement = ''
-    // this.dom.info.append()
+    // Create info item
+    const infoItem = html('li', { class: 'cs__info-item' },
+      html('i', { class: 'cs__info-legend', style: `background-color:${color}` }))
+    const valueElement = html('span', { class: 'cs__info-value' }, value)
+    infoItem.appendChild(valueElement)
+
+    // Append to DOM
+    this.dom.sliders.appendChild(sliderElement)
+    this.dom.info.appendChild(infoItem)
 
     // Return references to DOM nodes
     return {
@@ -48,5 +107,18 @@ class CircularSlider {
       id,
       value
     }
+  }
+
+  _recalculateDimensions () {
+    const radius = 100 * (this.sliders.length + 1)
+    const size = radius * 2 + 20
+    const offset = size / -2
+    return [radius, `${offset} ${offset} ${size} ${size}`]
+  }
+
+  _updateSliderValue (sliderIdx, value) {
+    this.sliders[sliderIdx].value = value
+    this.sliders[sliderIdx].valueElement.value = value
+    // TODO: change also slider element
   }
 }
