@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+    <title>Celtra Challenge</title>
+    <link rel="stylesheet" href="./circular-slider.css">
+    <style>
+      html { font-size: 12px; }
+      body {
+        margin: 0;
+        color: #333;
+        background: #f4f4f4;
+        font-family: sans-serif;
+        font-size: 1rem;
+        line-height: 1.5;
+      }
+      h1 { font-size: 2rem; }
+      @media (min-width: 720px) {
+        html { font-size: 16px; }
+      }
+      .demo { height: 400px; }
+    </style>
+  </head>
+  <body>
+    <h1>Celtra Challenge</h1>
+    <div class="demo" id="example1"></div>
+    <div>
+      <button id="new-slider">Append an extra slider</button>
+      <button id="get-values">Get slider values</button>
+    </div>
+    <script src="./circular-slider.js"></script>
+    <script>
+      ((w, d) => {
+        // FEATURE 1: Create a circular slider control with some initial sliders
+        const circularSlider1 = new CircularSlider(
+          d.getElementById('example1'),
+          [
+            { id: 's1', color: '#f0f', min: 0, max: 100, step: 2, value: 50 },
+            { id: 's2', color: '#00f', min: 200, max: 600, step: 1, value: 200 }
+          ]
+        )
+
+        // FEATURE 2: Append an additional slider later in the code
+        d.getElementById('new-slider').addEventListener('click', () => {
+          circularSlider1.appendSlider({ id: 's3', color: '#0f0', min: 0, max: 10, step: 1, value: 1 })
+        })
+
+        // FEATURE 3: Bind an onChange listener to react to changes
+        circularSlider1.onChange(({ id, value }) => {
+          console.log(`Slider with id ${id} has value ${value}`)
+        })
+
+        // FEATURE 4: Set a slider's value
+        circularSlider1.setValue('s2', 400)
+
+        // FEATURE 5: Get a slider's value
+        const s2val = circularSlider1.getValue('s2')
+        console.log(`Slider with id s2 has value ${s2val}`)
+      })(window, document)
+    </script>
+  </body>
+</html>
