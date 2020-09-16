@@ -88,7 +88,17 @@ class CircularSlider {
     // Create SVG circle
     const [r, viewBox] = this._recalculateDimensions()
     this.dom.sliders.setAttributeNS(null, 'viewBox', viewBox)
-    const sliderElement = svg('circle', { class: 'cs__slider', x: 0, y: 0, r, stroke: color })
+    /**
+     * SVG arc:
+     * M 0,-300               # Starting point: x = 0, y = -r
+     * A 300,300 0 0 1 0,300  # Draw half arc: r,r angle irrelevant clockwise end-point
+     * A 300,300 0 0 1 0,-300 # Draw other half: r,r angle, irrelevant clockwise, end-point
+     */
+    const sliderElement = svg('path', {
+      class: 'cs__slider',
+      d: `M0,${-r}A${r},${r} 0 0 1 0,${r}A${r},${r} 0 0 1 0,${-r}`,
+      stroke: color
+    })
 
     // Create info item
     const infoItem = html('li', { class: 'cs__info-item' },
