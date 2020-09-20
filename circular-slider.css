@@ -16,7 +16,4 @@
   height: 10px;
 }
 
-.cs__slider {
-  fill: none;
-  stroke-width: 3;
-}
+.cs__slider { fill: none; }

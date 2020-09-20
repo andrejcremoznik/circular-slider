@@ -43,14 +43,14 @@
         const circularSlider1 = new CircularSlider(
           d.getElementById('example1'),
           [
-            { id: 's1', color: '#f0f', min: 0, max: 100, step: 2, value: 50 },
-            { id: 's2', color: '#00f', min: 200, max: 600, step: 1, value: 200 }
+            { id: 's1', step: 2, value: 90 },
+            { id: 's2', min: 200, max: 600, step: 1, value: 300 }
           ]
         )
 
         // FEATURE 2: Append an additional slider later in the code
         d.getElementById('new-slider').addEventListener('click', () => {
-          circularSlider1.appendSlider({ id: 's3', color: '#0f0', min: 0, max: 10, step: 1, value: 1 })
+          circularSlider1.appendSlider({ max: 10, value: 4 })
         })
 
         // FEATURE 3: Bind an onChange listener to react to changes

@@ -30,14 +30,46 @@ const html = (tag, attrs = {}, ...children) => {
   return el
 }
 
+// Helper to generate a fallback random color
+const randomColor = () => `hsl(${Math.floor(Math.random() * 360)}, 100%, ${Math.floor(Math.random() * 50) + 25}%)`
+
+// Helper to generate a random ID
+const randomId = (len = 5) => `_${Math.random().toString(36).substr(2, len)}`
+
+
+/**
+ * Circular Slider
+ *
+ * Instantiate:
+ * cont slider = new CircularSlider(container = Node, sliderConfigs = [], globalConfig = {})
+ * - sliderConfigs Array  reqired  Array of config objects for individual sliders
+ * - globalConfig  Object optional Aditional configuration for all sliders
+ *
+ * Slider configuration object:
+ * - id        String optional (default: random)
+ * - color     String optional (default: random) Color for the slider
+ * - min       Number optional (default: 0)
+ * - max       Number optional (default: 100)
+ * - step      Number optional (default: 1)
+ * - value     Number optional (default: 0)
+ *
+ * Global configuration object:
+ * - thickness   Number optional (default: 20) Change the thickness of the sliders
+ * - innerRadius Number optional (default: 40) Adjust the inner radius size
+ */
 class CircularSlider {
-  constructor (container, slidersConfigs) {
+  constructor (container, slidersConfigs, globalConfig) {
     this.dom = this._constructContainer(container)
     this.sliders = []
+    this.globalConfig = Object.assign({ thickness: 20, innerRadius: 40 }, globalConfig)
+    // Initialize default sliders
     slidersConfigs.forEach(sliderConfig => this.appendSlider(sliderConfig))
   }
 
   appendSlider (sliderConfig) {
+    if (this.sliders.findIndex(s => s.id === sliderConfig.id) > -1) {
+      throw new Error(`Cannot create slider ${sliderConfig.id} (id collision).`)
+    }
     this.sliders.push(this._constructSlider(sliderConfig))
   }
 
@@ -50,8 +82,7 @@ class CircularSlider {
     if (!sliderId) {
       return this.sliders.map(({ id, value }) => ({ id, value }))
     }
-    const { value } = this.sliders.find(slider => slider.id === sliderId)
-    return value
+    return this.sliders.find(slider => slider.id === sliderId)?.value
   }
 
   setValue (sliderId, value) {
@@ -60,6 +91,10 @@ class CircularSlider {
     this._updateSliderValue(sliderIdx, value)
   }
 
+  /**
+   * Main function that will construct the DOM with the
+   * SVG container and the info label area
+   */
   _constructContainer (containerNode) {
     // Generate basic DOM for the area with sliders
     const slidersWrapper = html('div', { class: 'cs__sliders' })
@@ -84,20 +119,31 @@ class CircularSlider {
     }
   }
 
-  _constructSlider ({ id, color, min = 0, max = 100, step = 1, value = 0}) {
-    // Create SVG circle
-    const [r, viewBox] = this._recalculateDimensions()
+  /**
+   * Main function that handles initial rendering of the sliders
+   */
+  _constructSlider ({
+    id = randomId(),
+    min = 0,
+    max = 100,
+    step = 1,
+    value = 0,
+    color = randomColor()
+  }) {
+    if (value < min) {
+      throw new Error('Provided slider value can not be smaller than min.')
+    }
+    const [radius, viewBox, valueToArcRatio] = this._calculateRenderProps(min, max)
+
+    // Update the container's viewBox
     this.dom.sliders.setAttributeNS(null, 'viewBox', viewBox)
-    /**
-     * SVG arc:
-     * M 0,-300               # Starting point: x = 0, y = -r
-     * A 300,300 0 0 1 0,300  # Draw half arc: r,r angle irrelevant clockwise end-point
-     * A 300,300 0 0 1 0,-300 # Draw other half: r,r angle, irrelevant clockwise, end-point
-     */
+
+    // Create new slider arc
     const sliderElement = svg('path', {
       class: 'cs__slider',
-      d: `M0,${-r}A${r},${r} 0 0 1 0,${r}A${r},${r} 0 0 1 0,${-r}`,
-      stroke: color
+      stroke: color,
+      'stroke-width': this.globalConfig.thickness,
+      d: this._drawArc((value - min) * valueToArcRatio, radius)
     })
 
     // Create info item
@@ -110,21 +156,66 @@ class CircularSlider {
     this.dom.sliders.appendChild(sliderElement)
     this.dom.info.appendChild(infoItem)
 
-    // Return references to DOM nodes
+    // Return references to DOM nodes with all calculated constants
     return {
       sliderElement,
       valueElement,
       id,
-      value
+      min,
+      max,
+      step,
+      value,
+      valueToArcRatio,
+      radius
     }
   }
 
-  _recalculateDimensions () {
-    const radius = 100 * (this.sliders.length + 1)
-    const size = radius * 2 + 20
+  // Precalculate as many constants as possible for each new slider added to the drawing
+  _calculateRenderProps (min, max) {
+    // Each slider will have a radius of idx*100
+    const radius = (this.globalConfig.thickness + 20) * (this.sliders.length + 1) + this.globalConfig.innerRadius
+    // Based on that calculate the SVG's coords system
+    // with 0,0 being the center of the sliders
+    const size = (radius + this.globalConfig.thickness) * 2
     const offset = size / -2
-    return [radius, `${offset} ${offset} ${size} ${size}`]
+    const viewBox = `${offset} ${offset} ${size} ${size}`
+    // Also calculate the constant for value adjusted radians
+    const valueToArcRatio = 2 * Math.PI / (max - min)
+    return [radius, viewBox, valueToArcRatio]
   }
+
+  // Convert the value adjusted by the min offset to angle
+  _valueToRadians (value0, valueToArcRatio) {
+    return value0 * valueToArcRatio
+  }
+
+  // Convert a touch/pointer coordinates to angle
+  _coordsToRadians (x, y) {
+    // TODO
+  }
+
+  // Convert angle to coordinates on the arc
+  _radiansToArcCoords (angle, radius) {
+    return [Math.sin(angle) * radius, -(Math.cos(angle) * radius)]
+  }
+
+  // Return the SVG path of the arc
+  _drawArc (angle, radius) {
+    const [x, y] = this._radiansToArcCoords(angle, radius)
+    // Example (radius = 100):
+    // M 0 -100
+    //   ^ Start drawing the arc at coordinate 0 -100 at 12 o'clock (Y axis is inverted)
+    // A 100 100 0 0 1 0 100
+    //   ^ A = arc, 100 100 = circle, 0 = irrelevant, 0 = irrelevant, 1 = clockwise, 0 100 = coords opposite of the starting point at 6 o'clock.
+    //   ^ Result is half-circle from 12 o'clock 0,-100 to 6 o'clock 0,100
+    // A 10 10 0 0 1 -100 0
+    //   ^ Continue a new arc on the other side from 6 o'clock 0,100 to 9'oclock -100,0
+    //   ^ Result is an arc that is 3/4 of a circle.
+    return x > 0
+      ? `M0 ${-radius}A${radius} ${radius} 0 0 1 ${x.toFixed(2)} ${y.toFixed(2)}`
+      : `M0 ${-radius}A${radius} ${radius} 0 0 1 0 ${radius}A${radius},${radius} 0 0 1 ${x.toFixed(2)},${y.toFixed(2)}`
+  }
+
 
   _updateSliderValue (sliderIdx, value) {
     this.sliders[sliderIdx].value = value
