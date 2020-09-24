@@ -36,7 +36,6 @@ const randomColor = () => `hsl(${Math.floor(Math.random() * 360)}, 100%, ${Math.
 // Helper to generate a random ID
 const randomId = (len = 5) => `_${Math.random().toString(36).substr(2, len)}`
 
-
 /**
  * Circular Slider
  *
@@ -64,6 +63,8 @@ class CircularSlider {
     this.globalConfig = Object.assign({ thickness: 20, innerRadius: 40 }, globalConfig)
     // Initialize default sliders
     slidersConfigs.forEach(sliderConfig => this.appendSlider(sliderConfig))
+    // Initialize event handlers on the interactive surface
+    this._eventHandlers()
   }
 
   appendSlider (sliderConfig) {
@@ -115,7 +116,8 @@ class CircularSlider {
     // Return references to DOM nodes
     return {
       sliders: slidersSvg,
-      info: infoWrapper
+      info: infoWrapper,
+      interactiveSurface
     }
   }
 
@@ -191,7 +193,8 @@ class CircularSlider {
 
   // Convert a touch/pointer coordinates to angle
   _coordsToRadians (x, y) {
-    // TODO
+    const tan = Math.atan2(x, y)
+    return x < 0 ? 2 * Math.PI + tan : tan
   }
 
   // Convert angle to coordinates on the arc
@@ -216,6 +219,66 @@ class CircularSlider {
       : `M0 ${-radius}A${radius} ${radius} 0 0 1 0 ${radius}A${radius},${radius} 0 0 1 ${x.toFixed(2)},${y.toFixed(2)}`
   }
 
+  _moveSlider (sliderIdx, angle) {
+    const { sliderElement, radius } = this.sliders[sliderIdx]
+    const arc = this._drawArc(angle, radius)
+    sliderElement.setAttributeNS(null, 'd', arc)
+  }
+
+  _getInteractiveSurfaceCenter () {
+    const r = this.dom.interactiveSurface.getBoundingClientRect()
+    const w = Math.round(r.width)
+    const h = Math.round(r.height)
+    // X and Y are adjusted for the center of the sliders
+    const x = Math.round(r.x + r.width / 2)
+    const y = Math.round(r.y + r.height / 2)
+    return [x, y]
+  }
+
+  _eventHandlers () {
+    const state = {
+      isMoving: false,
+      center: this._getInteractiveSurfaceCenter()
+    }
+    const evtOpts = { passive: true }
+
+    const start = e => {
+      // TODO: determine active slider
+      state.isMoving = true
+    }
+
+    const stop = () => { state.isMoving = false }
+
+    const move = e => {
+      if (!state.isMoving) return
+      e.stopPropagation()
+      window.requestAnimationFrame(() => {
+        const angle = this._coordsToRadians(e.clientX - state.center[0], -(e.clientY - state.center[1]))
+        this._moveSlider(1, angle)
+      })
+    }
+
+    // Bind only necessary listeners
+    if ('onmousemove' in window) {
+      this.dom.interactiveSurface.addEventListener('mousedown', start, evtOpts)
+      this.dom.interactiveSurface.addEventListener('mouseup', stop, evtOpts)
+      this.dom.interactiveSurface.addEventListener('mouseleave', stop, evtOpts)
+      this.dom.interactiveSurface.addEventListener('mousemove', move, evtOpts)
+    }
+    if ('ontouchmove' in window) {
+      this.dom.interactiveSurface.addEventListener('touchmove', move, evtOpts)
+      this.dom.interactiveSurface.addEventListener('touchstart', start, evtOpts)
+      this.dom.interactiveSurface.addEventListener('touchend', stop, evtOpts)
+      this.dom.interactiveSurface.addEventListener('touchcancel', stop, evtOpts)
+    }
+
+    // If window resizes, recalculate the interactive surface DOMRect
+    window.addEventListener('resize', () => {
+      window.requestAnimationFrame(() => {
+        state.center = this._getInteractiveSurfaceCenter()
+      })
+    }, evtOpts)
+  }
 
   _updateSliderValue (sliderIdx, value) {
     this.sliders[sliderIdx].value = value

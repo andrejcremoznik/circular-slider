@@ -17,3 +17,10 @@
 }
 
 .cs__slider { fill: none; }
+
+
+.cs__sliders { position: relative; }
+.cs__sliders-surface {
+  position: absolute;
+  top: 0; right: 0; bottom: 0; left: 0;
+}
