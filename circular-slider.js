@@ -135,7 +135,7 @@ class CircularSlider {
     if (value < min) {
       throw new Error('Provided slider value can not be smaller than min.')
     }
-    const [radius, viewBox, valueToArcRatio] = this._calculateRenderProps(min, max)
+    const [radius, viewBox, valueToArcRatio, value0] = this._calculateRenderProps(value, min, max)
 
     // Update the container's viewBox
     this.dom.sliders.setAttributeNS(null, 'viewBox', viewBox)
@@ -145,7 +145,7 @@ class CircularSlider {
       class: 'cs__slider',
       stroke: color,
       'stroke-width': this.globalConfig.thickness,
-      d: this._drawArc((value - min) * valueToArcRatio, radius)
+      d: this._drawArc(this._valueToRadians(value0, valueToArcRatio), radius)
     })
 
     // Create info item
@@ -173,7 +173,7 @@ class CircularSlider {
   }
 
   // Precalculate as many constants as possible for each new slider added to the drawing
-  _calculateRenderProps (min, max) {
+  _calculateRenderProps (value, min, max) {
     // Each slider will have a radius of idx*100
     const radius = (this.globalConfig.thickness + 20) * (this.sliders.length + 1) + this.globalConfig.innerRadius
     // Based on that calculate the SVG's coords system
@@ -181,9 +181,12 @@ class CircularSlider {
     const size = (radius + this.globalConfig.thickness) * 2
     const offset = size / -2
     const viewBox = `${offset} ${offset} ${size} ${size}`
+    // Zero-adjusted values
+    const value0 = value - min
+    const max0 = max - min
     // Also calculate the constant for value adjusted radians
-    const valueToArcRatio = 2 * Math.PI / (max - min)
-    return [radius, viewBox, valueToArcRatio]
+    const valueToArcRatio = 2 * Math.PI / max0
+    return [radius, viewBox, valueToArcRatio, value0]
   }
 
   // Convert the value adjusted by the min offset to angle
@@ -223,6 +226,7 @@ class CircularSlider {
     const { sliderElement, radius } = this.sliders[sliderIdx]
     const arc = this._drawArc(angle, radius)
     sliderElement.setAttributeNS(null, 'd', arc)
+    this.sliders[sliderIdx].angle = angle
   }
 
   _getInteractiveSurfaceCenter () {
@@ -238,7 +242,8 @@ class CircularSlider {
   _eventHandlers () {
     const state = {
       isMoving: false,
-      center: this._getInteractiveSurfaceCenter()
+      center: this._getInteractiveSurfaceCenter(),
+      activeSlider: 1
     }
     const evtOpts = { passive: true }
 
@@ -253,8 +258,16 @@ class CircularSlider {
       if (!state.isMoving) return
       e.stopPropagation()
       window.requestAnimationFrame(() => {
-        const angle = this._coordsToRadians(e.clientX - state.center[0], -(e.clientY - state.center[1]))
-        this._moveSlider(1, angle)
+        const x = e.clientX - state.center[0]
+        const y = -(e.clientY - state.center[1])
+        // Prevent the slider from jumping from 100% to 0% or back when dragged over the end
+        const lockedX = y > 0
+          ? this.sliders[state.activeSlider].angle > Math.PI
+            ? Math.min(-1, x)
+            : Math.max(1, x)
+          : x
+        const angle = this._coordsToRadians(lockedX, y)
+        this._moveSlider(state.activeSlider, angle)
       })
     }
 
