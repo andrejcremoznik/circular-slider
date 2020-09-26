@@ -40,7 +40,7 @@ const randomId = (len = 5) => `_${Math.random().toString(36).substr(2, len)}`
  * Circular Slider
  *
  * Instantiate:
- * cont slider = new CircularSlider(container = Node, sliderConfigs = [], globalConfig = {})
+ * const slider = new CircularSlider(container = Node, sliderConfigs = [], globalConfig = {})
  * - sliderConfigs Array  reqired  Array of config objects for individual sliders
  * - globalConfig  Object optional Aditional configuration for all sliders
  *
@@ -60,6 +60,7 @@ const randomId = (len = 5) => `_${Math.random().toString(36).substr(2, len)}`
 class CircularSlider {
   constructor (container, slidersConfigs, globalConfig) {
     this.uid = randomId()
+    this.pi2 = 2 * Math.PI
     this.globalConfig = Object.assign({ thickness: 20, innerRadius: 40 }, globalConfig)
     this.interactiveSurfaceProps = [0, 0, 1] // center x and y offsets, px to svg coords ratio
     this.sliders = []
@@ -158,6 +159,7 @@ class CircularSlider {
       size,
       viewBox,
       valueToArcRatio,
+      stepToArcRatio,
       value0,
       strokeDashArray
     ] = this._calculateRenderProps(value, min, max, step)
@@ -180,7 +182,7 @@ class CircularSlider {
       class: 'cs__slider-decor',
       'stroke-width': this.globalConfig.thickness,
       'stroke-dasharray': strokeDashArray,
-      d: this._drawArc(Math.PI * 2, radius)
+      d: this._drawArc(this.pi2, radius)
     })
     const sliderFragments = new DocumentFragment()
     sliderFragments.appendChild(sliderDecor)
@@ -209,6 +211,7 @@ class CircularSlider {
       step,
       value,
       valueToArcRatio,
+      stepToArcRatio,
       radius
     }
   }
@@ -226,14 +229,14 @@ class CircularSlider {
     // Zero-adjusted values
     const value0 = value - min
     const max0 = max - min
-    // Also calculate the constant for value adjusted radians
-    const cRadians = 2 * Math.PI
-    const valueToArcRatio = cRadians / max0
+    // Also calculate the constant for value and step adjusted radians
+    const valueToArcRatio = this.pi2 / max0
+    const stepToArcRatio = this.pi2 / (max0 / step)
     // Calculate dasharray value to render step size on the arc
-    const stepDash = cRadians * radius / (max0 / step)
+    const stepDash = stepToArcRatio * radius
     // If stepDash is really short, multiply it by 10 for appearance reasons
     const strokeDashArray = `${((stepDash < 10 ? stepDash * 10 : stepDash) - 1).toFixed(5)} 1`
-    return [radius, size, viewBox, valueToArcRatio, value0, strokeDashArray]
+    return [radius, size, viewBox, valueToArcRatio, stepToArcRatio, value0, strokeDashArray]
   }
 
   _updateInteractiveSurfaceProps (svgSize) {
@@ -260,7 +263,7 @@ class CircularSlider {
   // Convert a touch/pointer coordinates to angle
   _coordsToRadians (x, y) {
     const tan = Math.atan2(x, y)
-    return x < 0 ? 2 * Math.PI + tan : tan
+    return x < 0 ? this.pi2 + tan : tan
   }
 
   // Convert angle to coordinates on the arc
@@ -285,9 +288,16 @@ class CircularSlider {
       : `M0 ${-radius}A${radius} ${radius} 0 0 1 0 ${radius}A${radius},${radius} 0 0 1 ${x.toFixed(2)},${y.toFixed(2)}`
   }
 
+  _snapAngleToClosestStep (angle, stepToArcRatio) {
+    if (angle < stepToArcRatio / 2) return 0.01
+    const overhead = angle % stepToArcRatio
+    return Math.min(angle - overhead + stepToArcRatio, this.pi2)
+  }
+
   _moveSlider (sliderIdx, angle) {
-    const { sliderElement, radius } = this.sliders[sliderIdx]
-    const arc = this._drawArc(angle, radius)
+    const { sliderElement, radius, stepToArcRatio } = this.sliders[sliderIdx]
+    const snapAngle = this._snapAngleToClosestStep(angle, stepToArcRatio)
+    const arc = this._drawArc(snapAngle, radius)
     sliderElement.setAttributeNS(null, 'd', arc)
     this.sliders[sliderIdx].angle = angle
   }
@@ -322,9 +332,9 @@ class CircularSlider {
     const stop = () => { state.activeSlider = -1 }
 
     const move = e => {
-      if (state.activeSlider < 0) return
       e.stopPropagation()
       window.requestAnimationFrame(() => {
+        if (state.activeSlider < 0) return
         const x = e.clientX - this.interactiveSurfaceProps[0]
         const y = -(e.clientY - this.interactiveSurfaceProps[1])
         // Prevent the slider from jumping from 100% to 0% or back when dragged over the end
