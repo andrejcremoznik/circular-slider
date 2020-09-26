@@ -58,9 +58,10 @@ const randomId = (len = 5) => `_${Math.random().toString(36).substr(2, len)}`
  */
 class CircularSlider {
   constructor (container, slidersConfigs, globalConfig) {
-    this.dom = this._constructContainer(container)
-    this.sliders = []
     this.globalConfig = Object.assign({ thickness: 20, innerRadius: 40 }, globalConfig)
+    this.interactiveSurfaceProps = [0, 0, 1] // center x and y offsets, px to svg coords ratio
+    this.sliders = []
+    this.dom = this._constructContainer(container)
     // Initialize default sliders
     slidersConfigs.forEach(sliderConfig => this.appendSlider(sliderConfig))
     // Initialize event handlers on the interactive surface
@@ -135,10 +136,11 @@ class CircularSlider {
     if (value < min) {
       throw new Error('Provided slider value can not be smaller than min.')
     }
-    const [radius, viewBox, valueToArcRatio, value0] = this._calculateRenderProps(value, min, max)
+    const [radius, size, viewBox, valueToArcRatio, value0] = this._calculateRenderProps(value, min, max)
 
     // Update the container's viewBox
     this.dom.sliders.setAttributeNS(null, 'viewBox', viewBox)
+    this._updateInteractiveSurfaceProps(size)
 
     // Create new slider arc
     const sliderElement = svg('path', {
@@ -174,7 +176,8 @@ class CircularSlider {
 
   // Precalculate as many constants as possible for each new slider added to the drawing
   _calculateRenderProps (value, min, max) {
-    // Each slider will have a radius of idx*100
+    // Each slider will have a radius of:
+    // (thickness + <distance between tracks>) * (number of sliders + 1) + innerRadius
     const radius = (this.globalConfig.thickness + 20) * (this.sliders.length + 1) + this.globalConfig.innerRadius
     // Based on that calculate the SVG's coords system
     // with 0,0 being the center of the sliders
@@ -186,7 +189,23 @@ class CircularSlider {
     const max0 = max - min
     // Also calculate the constant for value adjusted radians
     const valueToArcRatio = 2 * Math.PI / max0
-    return [radius, viewBox, valueToArcRatio, value0]
+    return [radius, size, viewBox, valueToArcRatio, value0]
+  }
+
+  _updateInteractiveSurfaceProps (svgSize) {
+    if (!svgSize) {
+      svgSize = Number.parseInt(this.dom.sliders.getAttribute('viewBox').split(' ').pop(), 10)
+    }
+    window.requestAnimationFrame(() => {
+      const r = this.dom.interactiveSurface.getBoundingClientRect()
+      const halfSize = Math.round(r.width / 2)
+      // Left and top offsets to the center of the interactive surface
+      const leftOffset = Math.round(r.x) + halfSize
+      const topOffset = Math.round(r.y) + halfSize
+      // Browser pixels to SVG coords ratio
+      const pxToSvgRatio = svgSize / (halfSize * 2)
+      this.interactiveSurfaceProps = [leftOffset, topOffset, pxToSvgRatio]
+    })
   }
 
   // Convert the value adjusted by the min offset to angle
@@ -229,37 +248,41 @@ class CircularSlider {
     this.sliders[sliderIdx].angle = angle
   }
 
-  _getInteractiveSurfaceCenter () {
-    const r = this.dom.interactiveSurface.getBoundingClientRect()
-    const w = Math.round(r.width)
-    const h = Math.round(r.height)
-    // X and Y are adjusted for the center of the sliders
-    const x = Math.round(r.x + r.width / 2)
-    const y = Math.round(r.y + r.height / 2)
-    return [x, y]
-  }
-
   _eventHandlers () {
     const state = {
-      isMoving: false,
-      center: this._getInteractiveSurfaceCenter(),
-      activeSlider: 1
+      activeSlider: -1
     }
-    const evtOpts = { passive: true }
+    // Interactive area should be slightly thicker than the stroke of the arc
+    // as this is calculated from the center of the stroke, we only need half of it
+    const interactiveThickness = this.globalConfig.thickness / 2 + 5
 
     const start = e => {
-      // TODO: determine active slider
-      state.isMoving = true
+      // Determine active slider:
+      // Click X and Y adjusted to interactive surface
+      const x = e.clientX - this.interactiveSurfaceProps[0]
+      const y = -(e.clientY - this.interactiveSurfaceProps[1])
+      // Longest side of this triangle is equal to radius: h^2 = x^2 + y^2
+      const h = Math.sqrt(Math.pow(Math.abs(x), 2) + Math.pow(Math.abs(y), 2))
+      // Adjust the radius form browser pixels to the SVGs local coords
+      const r = h * this.interactiveSurfaceProps[2]
+      // The click will activate the slider if the radius is within the arc's stroke
+      state.activeSlider = this.sliders.findIndex(({ radius }) =>
+        radius - interactiveThickness < r && radius + interactiveThickness > r)
+      // If a slider stroke is clicked, move arc to it
+      if (state.activeSlider > -1) {
+        const angle = this._coordsToRadians(x, y)
+        this._moveSlider(state.activeSlider, angle)
+      }
     }
 
-    const stop = () => { state.isMoving = false }
+    const stop = () => { state.activeSlider = -1 }
 
     const move = e => {
-      if (!state.isMoving) return
+      if (state.activeSlider < 0) return
       e.stopPropagation()
       window.requestAnimationFrame(() => {
-        const x = e.clientX - state.center[0]
-        const y = -(e.clientY - state.center[1])
+        const x = e.clientX - this.interactiveSurfaceProps[0]
+        const y = -(e.clientY - this.interactiveSurfaceProps[1])
         // Prevent the slider from jumping from 100% to 0% or back when dragged over the end
         const lockedX = y > 0
           ? this.sliders[state.activeSlider].angle > Math.PI
@@ -272,6 +295,7 @@ class CircularSlider {
     }
 
     // Bind only necessary listeners
+    const evtOpts = { passive: true }
     if ('onmousemove' in window) {
       this.dom.interactiveSurface.addEventListener('mousedown', start, evtOpts)
       this.dom.interactiveSurface.addEventListener('mouseup', stop, evtOpts)
@@ -288,7 +312,7 @@ class CircularSlider {
     // If window resizes, recalculate the interactive surface DOMRect
     window.addEventListener('resize', () => {
       window.requestAnimationFrame(() => {
-        state.center = this._getInteractiveSurfaceCenter()
+        this._updateInteractiveSurfaceProps()
       })
     }, evtOpts)
   }
