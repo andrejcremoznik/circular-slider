@@ -25,8 +25,13 @@
         justify-content: center;
       }
       .demo > .cs__sliders,
-      .demo > .cs_info { flex: 0 0 auto; }
+      .demo > .cs__info {
+        flex: 0 0 auto;
+        margin: 0 2em;
+      }
       .demo > .cs__sliders { height: 400px; }
+      .demo > .cs__info { order: 1; }
+      .demo > .cs__sliders { order: 2; }
     </style>
   </head>
   <body>
@@ -43,7 +48,7 @@
         const circularSlider1 = new CircularSlider(
           d.getElementById('example1'),
           [
-            { id: 's1', step: 2, value: 90 },
+            { id: 's1', step: 2, value: 90, label: 'Slider label' },
             { id: 's2', min: 200, max: 600, step: 10, value: 300 }
           ]
         )

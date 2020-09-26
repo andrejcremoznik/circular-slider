@@ -51,6 +51,7 @@ const randomId = (len = 5) => `_${Math.random().toString(36).substr(2, len)}`
  * - max       Number optional (default: 100)
  * - step      Number optional (default: 1)
  * - value     Number optional (default: 0)
+ * - label     String optional (default: '')
  *
  * Global configuration object:
  * - thickness   Number optional (default: 20) Change the thickness of the sliders
@@ -58,6 +59,7 @@ const randomId = (len = 5) => `_${Math.random().toString(36).substr(2, len)}`
  */
 class CircularSlider {
   constructor (container, slidersConfigs, globalConfig) {
+    this.uid = randomId()
     this.globalConfig = Object.assign({ thickness: 20, innerRadius: 40 }, globalConfig)
     this.interactiveSurfaceProps = [0, 0, 1] // center x and y offsets, px to svg coords ratio
     this.sliders = []
@@ -101,6 +103,20 @@ class CircularSlider {
     // Generate basic DOM for the area with sliders
     const slidersWrapper = html('div', { class: 'cs__sliders' })
     const slidersSvg = svg('svg', { class: 'cs__sliders-gfx', preserveAspectRatio: 'xMidYMid meet' })
+
+    const dragHandleSize = Math.ceil(this.globalConfig.thickness / 2)
+    const slidersDragHandle = svg('defs', {}, svg('marker', {
+      id: `cs-handle${this.uid}`,
+      class: 'cs__slider-handle',
+      viewBox: `0 0 ${dragHandleSize * 2 + 2} ${dragHandleSize * 2 + 2}`,
+      refX: dragHandleSize + 1,
+      refY: dragHandleSize + 1,
+      markerWidth: dragHandleSize * 2 + 6,
+      markerHeight: dragHandleSize * 2 + 6,
+      markerUnits: 'userSpaceOnUse'
+    }, svg('circle', { cx: dragHandleSize + 1, cy: dragHandleSize + 1, r: dragHandleSize })))
+    slidersSvg.appendChild(slidersDragHandle)
+
     const interactiveSurface = html('div', { class: 'cs__sliders-surface' })
     slidersWrapper.appendChild(slidersSvg)
     slidersWrapper.appendChild(interactiveSurface)
@@ -131,7 +147,8 @@ class CircularSlider {
     max = 100,
     step = 1,
     value = 0,
-    color = randomColor()
+    color = randomColor(),
+    label = ''
   }) {
     if (value < min) {
       throw new Error('Provided slider value can not be smaller than min.')
@@ -155,6 +172,7 @@ class CircularSlider {
       class: 'cs__slider',
       stroke: color,
       'stroke-width': this.globalConfig.thickness,
+      'marker-end': `url(#cs-handle${this.uid})`,
       d: this._drawArc(this._valueToRadians(value0, valueToArcRatio), radius)
     })
     // Create background circle circle decoration
@@ -171,7 +189,9 @@ class CircularSlider {
 
     // Create info item
     const infoItem = html('li', { class: 'cs__info-item' },
-      html('i', { class: 'cs__info-legend', style: `background-color:${color}` }))
+      html('i', { class: 'cs__info-legend', style: `background-color:${color}` }),
+      label && html('span', { class: 'cs__info-label' }, label)
+    )
     const valueElement = html('span', { class: 'cs__info-value' }, value)
     infoItem.appendChild(valueElement)
 

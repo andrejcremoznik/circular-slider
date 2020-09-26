@@ -10,11 +10,29 @@
   list-style: none;
 }
 
+.cs__info-item {
+  display: flex;
+  align-items: center;
+}
+
+.cs__info-value,
+.cs__info-legend,
+.cs__info-label { flex: 0 0 auto; }
+
+.cs__info-value {
+  order: 1;
+  width: 80px;
+  font-size: 1.5em;
+  font-weight: bold;
+  text-align: right;
+}
 .cs__info-legend {
-  display: inline-block;
+  order: 2;
   width: 20px;
   height: 10px;
+  margin: 0 1em;
 }
+.cs__info-label { order: 3; }
 
 .cs__slider,
 .cs__slider-decor { fill: none; }
@@ -22,7 +40,14 @@
 .cs__slider-decor { stroke: #cecece; }
 
 .cs__sliders { position: relative; }
+
 .cs__sliders-surface {
   position: absolute;
   top: 0; right: 0; bottom: 0; left: 0;
+}
+
+.cs__slider-handle {
+  fill: #fff;
+  stroke: #bbb;
+  stroke-width: 1;
 }
