@@ -16,8 +16,10 @@
   height: 10px;
 }
 
-.cs__slider { fill: none; }
+.cs__slider,
+.cs__slider-decor { fill: none; }
 
+.cs__slider-decor { stroke: #cecece; }
 
 .cs__sliders { position: relative; }
 .cs__sliders-surface {

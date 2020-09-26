@@ -136,11 +136,19 @@ class CircularSlider {
     if (value < min) {
       throw new Error('Provided slider value can not be smaller than min.')
     }
-    const [radius, size, viewBox, valueToArcRatio, value0] = this._calculateRenderProps(value, min, max)
+    const [
+      radius,
+      size,
+      viewBox,
+      valueToArcRatio,
+      value0,
+      strokeDashArray
+    ] = this._calculateRenderProps(value, min, max, step)
 
     // Update the container's viewBox
     this.dom.sliders.setAttributeNS(null, 'viewBox', viewBox)
     this._updateInteractiveSurfaceProps(size)
+
 
     // Create new slider arc
     const sliderElement = svg('path', {
@@ -149,6 +157,17 @@ class CircularSlider {
       'stroke-width': this.globalConfig.thickness,
       d: this._drawArc(this._valueToRadians(value0, valueToArcRatio), radius)
     })
+    // Create background circle circle decoration
+    const sliderDecor = svg('path', {
+      class: 'cs__slider-decor',
+      'stroke-width': this.globalConfig.thickness,
+      'stroke-dasharray': strokeDashArray,
+      d: this._drawArc(Math.PI * 2, radius)
+    })
+    const sliderFragments = new DocumentFragment()
+    sliderFragments.appendChild(sliderDecor)
+    sliderFragments.appendChild(sliderElement)
+
 
     // Create info item
     const infoItem = html('li', { class: 'cs__info-item' },
@@ -157,7 +176,7 @@ class CircularSlider {
     infoItem.appendChild(valueElement)
 
     // Append to DOM
-    this.dom.sliders.appendChild(sliderElement)
+    this.dom.sliders.appendChild(sliderFragments)
     this.dom.info.appendChild(infoItem)
 
     // Return references to DOM nodes with all calculated constants
@@ -175,7 +194,7 @@ class CircularSlider {
   }
 
   // Precalculate as many constants as possible for each new slider added to the drawing
-  _calculateRenderProps (value, min, max) {
+  _calculateRenderProps (value, min, max, step) {
     // Each slider will have a radius of:
     // (thickness + <distance between tracks>) * (number of sliders + 1) + innerRadius
     const radius = (this.globalConfig.thickness + 20) * (this.sliders.length + 1) + this.globalConfig.innerRadius
@@ -188,8 +207,13 @@ class CircularSlider {
     const value0 = value - min
     const max0 = max - min
     // Also calculate the constant for value adjusted radians
-    const valueToArcRatio = 2 * Math.PI / max0
-    return [radius, size, viewBox, valueToArcRatio, value0]
+    const cRadians = 2 * Math.PI
+    const valueToArcRatio = cRadians / max0
+    // Calculate dasharray value to render step size on the arc
+    const stepDash = cRadians * radius / (max0 / step)
+    // If stepDash is really short, multiply it by 10 for appearance reasons
+    const strokeDashArray = `${((stepDash < 10 ? stepDash * 10 : stepDash) - 1).toFixed(5)} 1`
+    return [radius, size, viewBox, valueToArcRatio, value0, strokeDashArray]
   }
 
   _updateInteractiveSurfaceProps (svgSize) {
