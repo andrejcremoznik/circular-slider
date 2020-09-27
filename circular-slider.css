@@ -1,8 +1,19 @@
-.cs__sliders-gfx {
-  display: block;
+.cs__sliders {
+  position: relative;
+  width: 100%;
+  height: 0;
+  padding: 0 0 100%;
+}
+
+.cs__sliders-gfx,
+.cd__sliders-surface {
+  position: absolute;
+  top: 0; left: 0;
   width: 100%;
   height: 100%;
 }
+
+.cs__sliders-gfx { display: block; }
 
 .cs__info {
   margin: 0;
@@ -38,8 +49,6 @@
 .cs__slider-decor { fill: none; }
 
 .cs__slider-decor { stroke: #cecece; }
-
-.cs__sliders { position: relative; }
 
 .cs__sliders-surface {
   position: absolute;
