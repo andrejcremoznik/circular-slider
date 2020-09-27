@@ -78,9 +78,8 @@ class CircularSlider {
     this.sliders.push(this._constructSlider(sliderConfig))
   }
 
-  onChange (onChangeCallback) {
-    // TODO: Run callback when values change
-    onChangeCallback({ id: 'foo', value: 'bar' })
+  onChange (callback) {
+    this.dom.container.addEventListener('change', e => callback(e.detail), false)
   }
 
   getValue (sliderId) {
@@ -93,7 +92,11 @@ class CircularSlider {
   setValue (sliderId, value) {
     const sliderIdx = this.sliders.findIndex(slider => slider.id === sliderId)
     if (sliderIdx < 0) return
-    // this._updateSliderValue(sliderIdx, value)
+    const angle = this._valueToRadians(value, this.sliders[sliderIdx].valueToArcRatio)
+    this._moveSlider(sliderIdx, angle)
+    this.dom.container.dispatchEvent(new CustomEvent('change', {
+      detail: { id: sliderId, value:  this.sliders[sliderIdx].value }
+    }))
   }
 
   /**
@@ -133,6 +136,7 @@ class CircularSlider {
 
     // Return references to DOM nodes
     return {
+      container: containerNode,
       sliders: slidersSvg,
       info: infoWrapper,
       interactiveSurface
@@ -329,12 +333,16 @@ class CircularSlider {
    * All event handlers are bound to the interacive surface - a div covering the SVG graphic
    */
   _eventHandlers () {
-    const state = { activeSlider: -1 }
+    const state = {
+      activeSlider: -1,
+      initialValue: -1
+    }
     // Interactive area should be slightly thicker than the stroke of the arc
     // as this is calculated from the center of the stroke, we only need half of it
     const thickness = this.globalConfig.thickness / 2 + 5
 
     const start = e => {
+      e.stopPropagation()
       // Determine active slider:
       // Click X and Y adjusted to interactive surface
       const x = e.clientX - this.interactiveSurfaceProps[0]
@@ -348,12 +356,24 @@ class CircularSlider {
         radius - thickness < r && radius + thickness > r)
       // If a slider stroke is clicked, move arc to it
       if (state.activeSlider > -1) {
-        const angle = this._coordsToRadians(x, y)
-        this._moveSlider(state.activeSlider, angle)
+        state.initialValue = this.sliders[state.activeSlider].value
+        this._moveSlider(state.activeSlider, this._coordsToRadians(x, y))
       }
     }
 
-    const stop = () => { state.activeSlider = -1 }
+    const stop = e => {
+      e.stopPropagation()
+      window.requestAnimationFrame(() => {
+        if (state.activeSlider < 0) return
+        // If the value changed, dispatch an event
+        const { id, value } = this.sliders[state.activeSlider]
+        if (value !== state.initialValue) {
+          this.dom.container.dispatchEvent(new CustomEvent('change', { detail: { id, value } }))
+        }
+        state.activeSlider = -1
+        state.initialValue = -1
+      })
+    }
 
     const move = e => {
       e.stopPropagation()

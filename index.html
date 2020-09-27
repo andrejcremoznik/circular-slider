@@ -38,8 +38,10 @@
     <h1>Celtra Challenge</h1>
     <div class="demo" id="example1"></div>
     <div>
-      <button id="new-slider">Append an extra slider</button>
-      <button id="get-values">Get slider values</button>
+      <button id="new-slider">Append a random slider</button>
+      <button id="get-values">Get all values</button>
+      <button id="get-value">Get inner value</button>
+      <button id="set-s1">Set inner to 75</button>
     </div>
     <script src="./circular-slider.js"></script>
     <script>
@@ -55,7 +57,9 @@
 
         // FEATURE 2: Append an additional slider later in the code
         d.getElementById('new-slider').addEventListener('click', () => {
-          circularSlider1.appendSlider({ max: 10, value: 4 })
+          const max = Math.round(Math.random() * 50)
+          const value = Math.round(Math.random() * max)
+          circularSlider1.appendSlider({ max, value })
         })
 
         // FEATURE 3: Bind an onChange listener to react to changes
@@ -64,15 +68,24 @@
         })
 
         // FEATURE 4: Set a slider's value
-        circularSlider1.setValue('s2', 400)
+        d.getElementById('set-s1').addEventListener('click', () => {
+          circularSlider1.setValue('s1', 75)
+        })
 
         // FEATURE 5: Get a slider's value
+        d.getElementById('get-value').addEventListener('click', () => {
+          const value = circularSlider1.getValue('s1')
+          console.log(value)
+          window.alert(value)
+        })
         const s2val = circularSlider1.getValue('s2')
         console.log(`Slider with id s2 has value ${s2val}`)
 
         // FEATURE 6: Get all sliders' values
         d.getElementById('get-values').addEventListener('click', () => {
-          console.log(circularSlider1.getValue())
+          const values = circularSlider1.getValue()
+          console.log(values)
+          window.alert(values.map(v => v.value).join(', '))
         })
       })(window, document)
     </script>
