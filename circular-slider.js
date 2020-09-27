@@ -93,7 +93,7 @@ class CircularSlider {
   setValue (sliderId, value) {
     const sliderIdx = this.sliders.findIndex(slider => slider.id === sliderId)
     if (sliderIdx < 0) return
-    this._updateSliderValue(sliderIdx, value)
+    // this._updateSliderValue(sliderIdx, value)
   }
 
   /**
@@ -160,8 +160,10 @@ class CircularSlider {
       viewBox,
       valueToArcRatio,
       stepToArcRatio,
+      arcToValueRatio,
       value0,
-      strokeDashArray
+      strokeDashArray,
+      stepDecimals
     ] = this._calculateRenderProps(value, min, max, step)
 
     // Update the container's viewBox
@@ -188,13 +190,12 @@ class CircularSlider {
     sliderFragments.appendChild(sliderDecor)
     sliderFragments.appendChild(sliderElement)
 
-
     // Create info item
     const infoItem = html('li', { class: 'cs__info-item' },
       html('i', { class: 'cs__info-legend', style: `background-color:${color}` }),
       label && html('span', { class: 'cs__info-label' }, label)
     )
-    const valueElement = html('span', { class: 'cs__info-value' }, value)
+    const valueElement = html('span', { class: 'cs__info-value' }, value.toFixed(stepDecimals))
     infoItem.appendChild(valueElement)
 
     // Append to DOM
@@ -209,9 +210,11 @@ class CircularSlider {
       min,
       max,
       step,
+      stepDecimals,
       value,
       valueToArcRatio,
       stepToArcRatio,
+      arcToValueRatio,
       radius
     }
   }
@@ -221,24 +224,31 @@ class CircularSlider {
     // Each slider will have a radius of:
     // (thickness + <distance between tracks>) * (number of sliders + 1) + innerRadius
     const radius = (this.globalConfig.thickness + 20) * (this.sliders.length + 1) + this.globalConfig.innerRadius
-    // Based on that calculate the SVG's coords system
-    // with 0,0 being the center of the sliders
+    // Based on that calculate the SVG's coords system with 0,0 being the center of the sliders
     const size = (radius + this.globalConfig.thickness) * 2
     const offset = size / -2
     const viewBox = `${offset} ${offset} ${size} ${size}`
     // Zero-adjusted values
     const value0 = value - min
     const max0 = max - min
-    // Also calculate the constant for value and step adjusted radians
+    // Calculate the constant for value and step adjusted radians
     const valueToArcRatio = this.pi2 / max0
     const stepToArcRatio = this.pi2 / (max0 / step)
+    const arcToValueRatio = max0 / this.pi2
     // Calculate dasharray value to render step size on the arc
     const stepDash = stepToArcRatio * radius
     // If stepDash is really short, multiply it by 10 for appearance reasons
     const strokeDashArray = `${((stepDash < 10 ? stepDash * 10 : stepDash) - 1).toFixed(5)} 1`
-    return [radius, size, viewBox, valueToArcRatio, stepToArcRatio, value0, strokeDashArray]
+    // Count number of step decimals to be used to round the value for display
+    const stepDecimals = step.toString().split('.')[1]?.length || 0
+    return [radius, size, viewBox, valueToArcRatio, stepToArcRatio, arcToValueRatio, value0, strokeDashArray, stepDecimals]
   }
 
+  /**
+   * The interactive surface is a div covering the SVG with the sliders. All events are intercepted there.
+   * In order to map trigger points to the underlying SVG, the div's coordinate system needs to be matched
+   * to the SVGs local coordinate system. This changes every time a new slider is added or the graphic rescales.
+   */
   _updateInteractiveSurfaceProps (svgSize) {
     if (!svgSize) {
       svgSize = Number.parseInt(this.dom.sliders.getAttribute('viewBox').split(' ').pop(), 10)
@@ -271,6 +281,21 @@ class CircularSlider {
     return [Math.sin(angle) * radius, -(Math.cos(angle) * radius)]
   }
 
+  // Adjust any angle to the closest step multiplier
+  _radiansToStepAngle (angle, stepToArcRatio) {
+    const overhead = angle % stepToArcRatio
+    const adjustedAngle = angle - overhead
+    return overhead > stepToArcRatio / 2
+      ? Math.min(adjustedAngle + stepToArcRatio, this.pi2)
+      : Math.max(adjustedAngle, 0.001) // Need a value > 0 to avoid a rendering bug
+  }
+
+  // Convert angle to value
+  _radiansToValue (angle, arcToValueRatio, min, stepDecimals) {
+    const value0 = angle === 0.001 ? 0 : angle * arcToValueRatio
+    return (value0 + min).toFixed(stepDecimals)
+  }
+
   // Return the SVG path of the arc
   _drawArc (angle, radius) {
     const [x, y] = this._radiansToArcCoords(angle, radius)
@@ -288,29 +313,26 @@ class CircularSlider {
       : `M0 ${-radius}A${radius} ${radius} 0 0 1 0 ${radius}A${radius},${radius} 0 0 1 ${x.toFixed(2)},${y.toFixed(2)}`
   }
 
-  _snapAngleToClosestStep (angle, stepToArcRatio) {
-    const overhead = angle % stepToArcRatio
-    const adjustedAngle = angle - overhead
-    return overhead > stepToArcRatio / 2
-      ? Math.min(adjustedAngle + stepToArcRatio, this.pi2)
-      : Math.max(adjustedAngle, 0.01)
-  }
-
+  // Main drawing function
   _moveSlider (sliderIdx, angle) {
-    const { sliderElement, radius, stepToArcRatio } = this.sliders[sliderIdx]
-    const snapAngle = this._snapAngleToClosestStep(angle, stepToArcRatio)
+    const { sliderElement, radius, stepToArcRatio, arcToValueRatio, min, stepDecimals } = this.sliders[sliderIdx]
+    const snapAngle = this._radiansToStepAngle(angle, stepToArcRatio)
+    const snapValue = this._radiansToValue(snapAngle, arcToValueRatio, min, stepDecimals)
     const arc = this._drawArc(snapAngle, radius)
-    sliderElement.setAttributeNS(null, 'd', arc)
     this.sliders[sliderIdx].angle = angle
+    this.sliders[sliderIdx].value = Number.parseFloat(snapValue)
+    sliderElement.setAttributeNS(null, 'd', arc)
+    this.sliders[sliderIdx].valueElement.textContent = snapValue
   }
 
+  /**
+   * All event handlers are bound to the interacive surface - a div covering the SVG graphic
+   */
   _eventHandlers () {
-    const state = {
-      activeSlider: -1
-    }
+    const state = { activeSlider: -1 }
     // Interactive area should be slightly thicker than the stroke of the arc
     // as this is calculated from the center of the stroke, we only need half of it
-    const interactiveThickness = this.globalConfig.thickness / 2 + 5
+    const thickness = this.globalConfig.thickness / 2 + 5
 
     const start = e => {
       // Determine active slider:
@@ -323,7 +345,7 @@ class CircularSlider {
       const r = h * this.interactiveSurfaceProps[2]
       // The click will activate the slider if the radius is within the arc's stroke
       state.activeSlider = this.sliders.findIndex(({ radius }) =>
-        radius - interactiveThickness < r && radius + interactiveThickness > r)
+        radius - thickness < r && radius + thickness > r)
       // If a slider stroke is clicked, move arc to it
       if (state.activeSlider > -1) {
         const angle = this._coordsToRadians(x, y)
@@ -371,11 +393,5 @@ class CircularSlider {
         this._updateInteractiveSurfaceProps()
       })
     }, evtOpts)
-  }
-
-  _updateSliderValue (sliderIdx, value) {
-    this.sliders[sliderIdx].value = value
-    this.sliders[sliderIdx].valueElement.value = value
-    // TODO: change also slider element
   }
 }
