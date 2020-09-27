@@ -158,6 +158,9 @@ class CircularSlider {
     if (value < min) {
       throw new Error('Provided slider value can not be smaller than min.')
     }
+    if (max < step) {
+      throw new Error('Provided slider max can not be smaller than step.')
+    }
     const [
       radius,
       size,
