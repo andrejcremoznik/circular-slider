@@ -289,9 +289,11 @@ class CircularSlider {
   }
 
   _snapAngleToClosestStep (angle, stepToArcRatio) {
-    if (angle < stepToArcRatio / 2) return 0.01
     const overhead = angle % stepToArcRatio
-    return Math.min(angle - overhead + stepToArcRatio, this.pi2)
+    const adjustedAngle = angle - overhead
+    return overhead > stepToArcRatio / 2
+      ? Math.min(adjustedAngle + stepToArcRatio, this.pi2)
+      : Math.max(adjustedAngle, 0.01)
   }
 
   _moveSlider (sliderIdx, angle) {
