@@ -54,3 +54,14 @@ Options that affect the appearance of all sliders.
 
 * `thickness` - Thickness of the slider. Default: 20
 * `innerRadius` - Radius to the inner most slider. Default: 40
+
+### Methods
+
+```js
+const slider = new CircularSlider(/* ... */)
+```
+
+* `slider.appendSlider({ sliderConfig })` - Append an aditional slider.
+* `slider.onChange(callback)` - Run the `callback` function every time the value is changed. `callback` receives an object param with the slider ID and its value.
+* `slider.getValue('x')` - Get the value for the slider with the ID `x`. If no ID is given, returns all sliders' values.
+* `slider.setValue('x', 123)` - Set the value of the slider with ID `x` to `123`.
