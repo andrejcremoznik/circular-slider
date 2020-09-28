@@ -65,3 +65,8 @@ const slider = new CircularSlider(/* ... */)
 * `slider.onChange(callback)` - Run the `callback` function every time the value is changed. `callback` receives an object param with the slider ID and its value.
 * `slider.getValue('x')` - Get the value for the slider with the ID `x`. If no ID is given, returns all sliders' values.
 * `slider.setValue('x', 123)` - Set the value of the slider with ID `x` to `123`.
+
+## Known issues
+
+* No support for Android Firefox due to [PointerEvents](https://developer.mozilla.org/en-US/docs/Web/API/Pointer_events#Browser_compatibility). Can be worked around by slightly complicating things with Mouse and Touch events.
+* You can not scroll the page down with a swipe if the start point is over the sliders element. Could be worked around by adding an overlay over the empty center that would re-enable touch actions.
