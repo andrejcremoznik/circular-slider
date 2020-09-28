@@ -184,7 +184,7 @@ class CircularSlider {
       'marker-end': `url(#cs-handle${this.uid})`,
       d: this._drawArc(this._valueToRadians(value0, valueToArcRatio), radius)
     })
-    // Create background circle circle decoration
+    // Create background circle decoration
     const sliderDecor = svg('path', {
       class: 'cs__slider-decor',
       'stroke-width': this.globalConfig.thickness,
@@ -288,7 +288,7 @@ class CircularSlider {
     const adjustedAngle = angle - overhead
     return overhead > stepToArcRatio / 2
       ? Math.min(adjustedAngle + stepToArcRatio, this.pi2)
-      : Math.max(adjustedAngle, 0.001) // Need a value > 0 to avoid a rendering bug
+      : Math.max(adjustedAngle, 0.001) // Need a value of > 0 to avoid a rendering bug
   }
 
   // Convert angle to value
