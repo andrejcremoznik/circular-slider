@@ -371,6 +371,7 @@ class CircularSlider {
       })
 
     const move = e => {
+      e.stopPropagation()
       window.requestAnimationFrame(() => {
         if (state.activeSlider < 0) return
         const x = e.clientX - state.surface[0]
@@ -386,7 +387,7 @@ class CircularSlider {
       })
     }
 
-    const evtOpts = { passive: true }
+    const evtOpts = { passive: true, capture: true }
     this.dom.interactiveSurface.addEventListener('pointerdown', start, evtOpts)
     this.dom.interactiveSurface.addEventListener('pointermove', move, evtOpts)
     this.dom.interactiveSurface.addEventListener('pointerout', stop, evtOpts)
