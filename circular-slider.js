@@ -61,8 +61,8 @@ class CircularSlider {
   constructor (container, slidersConfigs, globalConfig) {
     this.uid = randomId()
     this.pi2 = 2 * Math.PI
+    this.svgSize = 0
     this.globalConfig = Object.assign({ thickness: 20, innerRadius: 40 }, globalConfig)
-    this.interactiveSurfaceProps = [0, 0, 1] // center x and y offsets, px to svg coords ratio
     this.sliders = []
     this.dom = this._constructContainer(container)
     // Initialize default sliders
@@ -173,10 +173,8 @@ class CircularSlider {
       stepDecimals
     ] = this._calculateRenderProps(value, min, max, step)
 
-    // Update the container's viewBox
-    this.dom.sliders.setAttributeNS(null, 'viewBox', viewBox)
-    this._updateInteractiveSurfaceProps(size)
-
+    // Update svgSize to be used for scaling browser to svg coords
+    this.svgSize = size
 
     // Create new slider arc
     const sliderElement = svg('path', {
@@ -205,7 +203,8 @@ class CircularSlider {
     const valueElement = html('span', { class: 'cs__info-value' }, value.toFixed(stepDecimals))
     infoItem.appendChild(valueElement)
 
-    // Append to DOM
+    // Write to DOM
+    this.dom.sliders.setAttributeNS(null, 'viewBox', viewBox)
     this.dom.sliders.appendChild(sliderFragments)
     this.dom.info.appendChild(infoItem)
 
@@ -254,22 +253,17 @@ class CircularSlider {
   /**
    * The interactive surface is a div covering the SVG with the sliders. All events are intercepted there.
    * In order to map trigger points to the underlying SVG, the div's coordinate system needs to be matched
-   * to the SVGs local coordinate system. This changes every time a new slider is added or the graphic rescales.
+   * to the SVGs local coordinate system every time an interaction begins
    */
-  _updateInteractiveSurfaceProps (svgSize) {
-    if (!svgSize) {
-      svgSize = Number.parseInt(this.dom.sliders.getAttribute('viewBox').split(' ').pop(), 10)
-    }
-    window.requestAnimationFrame(() => {
-      const r = this.dom.interactiveSurface.getBoundingClientRect()
-      const halfSize = Math.round(r.width / 2)
-      // Left and top offsets to the center of the interactive surface
-      const leftOffset = Math.round(r.x) + halfSize
-      const topOffset = Math.round(r.y) + halfSize
-      // Browser pixels to SVG coords ratio
-      const pxToSvgRatio = svgSize / (halfSize * 2)
-      this.interactiveSurfaceProps = [leftOffset, topOffset, pxToSvgRatio]
-    })
+  _calculateInteractiveSurfaceProps () {
+    const r = this.dom.interactiveSurface.getBoundingClientRect()
+    const halfSize = Math.round(r.width / 2)
+    // Left and top offsets to the center of the interactive surface
+    const xOffset = Math.round(r.x) + halfSize
+    const yOffset = Math.round(r.y) + halfSize
+    // Browser pixels to SVG coords ratio
+    const pxToSvgRatio = this.svgSize / (halfSize * 2)
+    return [xOffset, yOffset, pxToSvgRatio]
   }
 
   // Convert the value adjusted by the min offset to angle
@@ -338,22 +332,23 @@ class CircularSlider {
   _eventHandlers () {
     const state = {
       activeSlider: -1,
-      initialValue: -1
+      initialValue: -1,
+      surface: null
     }
     // Interactive area should be slightly thicker than the stroke of the arc
     // as this is calculated from the center of the stroke, we only need half of it
     const thickness = this.globalConfig.thickness / 2 + 5
 
     const start = e => {
-      e.stopPropagation()
       // Determine active slider:
       // Click X and Y adjusted to interactive surface
-      const x = e.clientX - this.interactiveSurfaceProps[0]
-      const y = -(e.clientY - this.interactiveSurfaceProps[1])
+      state.surface = this._calculateInteractiveSurfaceProps()
+      const x = e.clientX - state.surface[0]
+      const y = -(e.clientY - state.surface[1])
       // Longest side of this triangle is equal to radius: h^2 = x^2 + y^2
       const h = Math.sqrt(Math.pow(Math.abs(x), 2) + Math.pow(Math.abs(y), 2))
-      // Adjust the radius form browser pixels to the SVGs local coords
-      const r = h * this.interactiveSurfaceProps[2]
+      // Adjust the radius from browser pixels to the SVGs local coords
+      const r = h * state.surface[2]
       // The click will activate the slider if the radius is within the arc's stroke
       state.activeSlider = this.sliders.findIndex(({ radius }) =>
         radius - thickness < r && radius + thickness > r)
@@ -364,8 +359,7 @@ class CircularSlider {
       }
     }
 
-    const stop = e => {
-      e.stopPropagation()
+    const stop = e =>
       window.requestAnimationFrame(() => {
         if (state.activeSlider < 0) return
         // If the value changed, dispatch an event
@@ -374,16 +368,13 @@ class CircularSlider {
           this.dom.container.dispatchEvent(new CustomEvent('change', { detail: { id, value } }))
         }
         state.activeSlider = -1
-        state.initialValue = -1
       })
-    }
 
     const move = e => {
-      e.stopPropagation()
       window.requestAnimationFrame(() => {
         if (state.activeSlider < 0) return
-        const x = e.clientX - this.interactiveSurfaceProps[0]
-        const y = -(e.clientY - this.interactiveSurfaceProps[1])
+        const x = e.clientX - state.surface[0]
+        const y = -(e.clientY - state.surface[1])
         // Prevent the slider from jumping from 100% to 0% or back when dragged over the end
         const lockedX = y > 0
           ? this.sliders[state.activeSlider].angle > Math.PI
@@ -395,26 +386,9 @@ class CircularSlider {
       })
     }
 
-    // Bind only necessary listeners
     const evtOpts = { passive: true }
-    if ('onmousemove' in window) {
-      this.dom.interactiveSurface.addEventListener('mousedown', start, evtOpts)
-      this.dom.interactiveSurface.addEventListener('mouseup', stop, evtOpts)
-      this.dom.interactiveSurface.addEventListener('mouseleave', stop, evtOpts)
-      this.dom.interactiveSurface.addEventListener('mousemove', move, evtOpts)
-    }
-    if ('ontouchmove' in window) {
-      this.dom.interactiveSurface.addEventListener('touchmove', move, evtOpts)
-      this.dom.interactiveSurface.addEventListener('touchstart', start, evtOpts)
-      this.dom.interactiveSurface.addEventListener('touchend', stop, evtOpts)
-      this.dom.interactiveSurface.addEventListener('touchcancel', stop, evtOpts)
-    }
-
-    // If window resizes, recalculate the interactive surface DOMRect
-    window.addEventListener('resize', () => {
-      window.requestAnimationFrame(() => {
-        this._updateInteractiveSurfaceProps()
-      })
-    }, evtOpts)
+    this.dom.interactiveSurface.addEventListener('pointerdown', start, evtOpts)
+    this.dom.interactiveSurface.addEventListener('pointermove', move, evtOpts)
+    this.dom.interactiveSurface.addEventListener('pointerout', stop, evtOpts)
   }
 }

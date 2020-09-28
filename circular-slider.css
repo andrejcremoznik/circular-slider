@@ -14,6 +14,7 @@
 }
 
 .cs__sliders-gfx { display: block; }
+.cs__sliders-surface { touch-action: none; }
 
 .cs__info {
   margin: 0;
