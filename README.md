@@ -70,3 +70,5 @@ const slider = new CircularSlider(/* ... */)
 
 * No support for Android Firefox due to [PointerEvents](https://developer.mozilla.org/en-US/docs/Web/API/Pointer_events#Browser_compatibility). Can be worked around by slightly complicating things with Mouse and Touch events.
 * You can not scroll the page down with a swipe if the start point is over the sliders element. Could be worked around by adding an overlay over the empty center that would re-enable touch actions.
+* There are major accessibility concerns with the current implementation because there's no way to adjust the values other than dragging over an empty area. This could be fixed by making the values on the side adjustable via hidden `<input>` controls accessible to screen readers. This is not a small task.
+* The usability of the sliders solely depends on the use. You can technically add an unlimited number of them but they wouldn't be usable. Especially on mobile devices, the interactive elements get very small real fast. I would not use this type of control in a real product but it's a cool test assignment.
