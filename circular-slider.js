@@ -301,12 +301,14 @@ class CircularSlider {
   _drawArc (angle, radius) {
     const [x, y] = this._radiansToArcCoords(angle, radius)
     // Example (radius = 100):
+    // M 0 -100 A 100 100 0 0 1 0 100 A 100 100 0 0 1 -100 0
+    // Explanation:
     // M 0 -100
     //   ^ Start drawing the arc at coordinate 0 -100 at 12 o'clock (Y axis is inverted)
     // A 100 100 0 0 1 0 100
     //   ^ A = arc, 100 100 = circle, 0 = irrelevant, 0 = irrelevant, 1 = clockwise, 0 100 = coords opposite of the starting point at 6 o'clock.
     //   ^ Result is half-circle from 12 o'clock 0,-100 to 6 o'clock 0,100
-    // A 10 10 0 0 1 -100 0
+    // A 100 100 0 0 1 -100 0
     //   ^ Continue a new arc on the other side from 6 o'clock 0,100 to 9'oclock -100,0
     //   ^ Result is an arc that is 3/4 of a circle.
     return x > 0
