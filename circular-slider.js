@@ -391,5 +391,6 @@ class CircularSlider {
     this.dom.interactiveSurface.addEventListener('pointerdown', start, evtOpts)
     this.dom.interactiveSurface.addEventListener('pointermove', move, evtOpts)
     this.dom.interactiveSurface.addEventListener('pointerout', stop, evtOpts)
+    this.dom.interactiveSurface.addEventListener('pointerup', stop, evtOpts)
   }
 }
